@@ -136,7 +136,7 @@ private class GrowwMarketClient(private val token: String) {
         return b.build().toString()
     }
     suspend fun ltps(symbols:List<String>):Map<String,Double> {
-        livePacer.acquire()
+        shorting40MarketDataPacer.acquire()
         val payload=json(url("live-data/ltp",mapOf("segment" to "CASH",
             "exchange_symbols" to symbols.joinToString(",") { "NSE_$it" })))
         return payload.entrySet().mapNotNull { (name,value)->
@@ -145,7 +145,7 @@ private class GrowwMarketClient(private val token: String) {
         }.toMap()
     }
     suspend fun quote(symbol:String):Quote {
-        livePacer.acquire()
+        shorting40MarketDataPacer.acquire()
         val p=json(url("live-data/quote",mapOf("exchange" to "NSE",
             "segment" to "CASH","trading_symbol" to symbol)))
         fun n(key:String)=runCatching { p.get(key)?.takeUnless { it.isJsonNull }?.asDouble }.getOrNull()
@@ -156,7 +156,7 @@ private class GrowwMarketClient(private val token: String) {
         )
     }
     suspend fun candles(symbol:String,now:LocalDateTime):List<Candle> {
-        historicalPacer.acquire()
+        shorting40MarketDataPacer.acquire()
         val fmt=DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")
         val params=mapOf("exchange" to "NSE","segment" to "CASH",
             "groww_symbol" to "NSE-$symbol","candle_interval" to "15minute",
