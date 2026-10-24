@@ -5,7 +5,7 @@ from the v7.7.2/v7.7.3 Multify architecture. The original Multify repository is
 not changed. Only the `:shorting` module compiles or ships; legacy `:app` is
 kept in this repository as an unbuilt reference for component-by-component parity.
 
-## First APK: paper-only engineering verification
+## Observation-first APK: live data, no simulated positions or orders
 
 - Exactly 40 deterministic bearish features, in families of 14/13/13.
 - Full NSE symbol-master LTP discovery, 50 per batch, nominal 150-second loop.
@@ -14,6 +14,11 @@ kept in this repository as an unbuilt reference for component-by-component parit
 - Current quotes and up to four calendar days of 15-minute Groww candles.
 - Quality gates, repeated PRIMARY confirmation and theoretical sell/cover prices.
 - Three visible tabs: Fixed, Forecast (uncalibrated research), Settings.
+- Forecast background scanner can be independently switched on/off; Fixed unaffected.
+- Manually entered Groww-whitelisted static IP and real outgoing-IP verification.
+- ARM, Fixed auto-SHORT and Forecast auto-SHORT switches are visible but locked
+  pending verified broker execution. This is **not** paper trading: no fictional
+  positions are opened, recorded or simulated.
 - Daily Groww API access token encrypted by Android Keystore.
 - No Multify notification listener, LONG/CNC trade execution, GTT or order
   submission code is built in the new module.
@@ -36,12 +41,12 @@ foreground scan and Android may still terminate it under some device conditions.
 5. 14:55 IST forced BUY-to-cover and emergency broker failure escalation.
 6. Conservative shared-account quota if Multify and Shorting-40 run together.
 7. Historical short-specific backtest including slippage, circuits and costs,
-   several paper sessions, and separate Forecast calibration.
+   several live-observation sessions without placing orders, and separate Forecast calibration.
 8. Stable release signing key stored securely in GitHub Actions secrets (not repo).
 
 ## Build
 
-GitHub Actions: **Shorting 40 Android — tests and installable paper APK**.
+GitHub Actions: **Shorting 40 Android — tests and installable observe APK**.
 Run `gradle :shorting:testDebugUnitTest :shorting:assembleDebug` with Java 17,
 Android SDK 35 and Gradle 8.9. APK artifact path:
 `shorting/build/outputs/apk/debug/shorting-debug.apk`.

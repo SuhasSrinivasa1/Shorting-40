@@ -47,4 +47,13 @@ class ShortFactorEngineTest {
         assertTrue(ShortRuntime.scanningAllowed(LocalDateTime.of(2026,10,26,9,15)))
         assertFalse(ShortRuntime.scanningAllowed(LocalDateTime.of(2026,10,26,15,30)))
     }
+    @Test fun observingCannotAccidentallyEnableLiveShortOrders() {
+        val allSwitches=ShortControls(
+            staticIp="203.0.113.10",observedIp="203.0.113.10",staticIpVerified=true,
+            armed=true,fixedAutoShortEnabled=true,forecastAutoShortEnabled=true)
+        assertFalse(ShortExecutionGate.LIVE_BROKER_EXECUTION_AVAILABLE)
+        assertFalse(ShortExecutionGate.canArm(tokenConfigured=true,controls=allSwitches))
+        assertFalse(ShortExecutionGate.canAutoShort(true,allSwitches,fixed=true))
+        assertFalse(ShortExecutionGate.canAutoShort(true,allSwitches,fixed=false))
+    }
 }

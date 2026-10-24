@@ -309,9 +309,11 @@ object ShortRuntime {
             // Forecast is a separate calibration product; do NOT pretend old LONG wins prove
             // that a short model works. Until a properly labeled short outcome set exists,
             // use strictly research-only relative ranking.
-            val forecast=approved.sortedByDescending { it.familyScore+.1*it.direction }
-                .map { ForecastRow(it,it.familyScore+.1*it.direction,0) }
-            state.value=ScanState(running=true,status="Scan complete — paper recommendations",
+            val forecast=if(ShortPreferences(context).load().forecastScannerEnabled)
+                approved.sortedByDescending { it.familyScore+.1*it.direction }
+                    .map { ForecastRow(it,it.familyScore+.1*it.direction,0) }
+                else emptyList()
+            state.value=ScanState(running=true,status="Scan complete — live observations only",
                 lastScanMs=System.currentTimeMillis(),masterCount=master.size,
                 coverage=coverage,evaluated=rows.size,
                 fixed=approved,forecast=forecast,
@@ -326,13 +328,13 @@ object ShortRuntime {
     private fun alert(context:Context,newRows:List<Signal>) {
         val manager=context.getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(NotificationChannel("shorting40_signals",
-            "Paper short recommendations",NotificationManager.IMPORTANCE_HIGH))
+            "Short setup observations",NotificationManager.IMPORTANCE_HIGH))
         if(Build.VERSION.SDK_INT>=33&&context.checkSelfPermission(
             android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED) return
         newRows.take(5).forEach { s->
             manager.notify(s.symbol.hashCode(),NotificationCompat.Builder(context,"shorting40_signals")
                 .setSmallIcon(android.R.drawable.ic_dialog_info)
-                .setContentTitle("PAPER SHORT · ${s.symbol}")
+                .setContentTitle("SHORT SETUP · ${s.symbol}")
                 .setContentText("SELL ₹%.2f · cover target ₹%.2f · stop ₹%.2f".format(s.entry,s.target,s.stop))
                 .setAutoCancel(true).build())
         }
@@ -351,7 +353,7 @@ class ShortScanService:Service() {
             "Market scanner",NotificationManager.IMPORTANCE_LOW))
         val notification:Notification=NotificationCompat.Builder(this,"shorting40_service")
             .setSmallIcon(android.R.drawable.ic_popup_sync)
-            .setContentTitle("Shorting 40 · paper market scanner")
+            .setContentTitle("Shorting 40 · live market scanner")
             .setContentText("NSE LTP discovery every 150 seconds · no live orders")
             .setOngoing(true).build()
         startForeground(4040,notification)

@@ -29,6 +29,7 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Slider
 import androidx.compose.material3.Surface
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -88,7 +89,7 @@ fun Shorting40App(start:()->Unit, stop:()->Unit) {
             Surface(tonalElevation=2.dp) {
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
                     Text("SHORTING 40",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-                    Text("Intraday NSE · paper-first · 40 bearish factors",
+                    Text("Intraday NSE · live observation · 40 bearish factors",
                         style=MaterialTheme.typography.bodySmall,color=subdued)
                 }
             }
@@ -143,7 +144,7 @@ private fun FixedScreen(state:ScanState,start:()->Unit,stop:()->Unit) {
             Spacer(Modifier.height(8.dp))
             Text("Fixed Short V1 · PRIMARY",style=MaterialTheme.typography.titleMedium,
                 fontWeight=FontWeight.SemiBold)
-            Text("Two confirmations for market discoveries; three for fallback candidates. All prices are paper signals.",
+            Text("Two confirmations for market discoveries; three for fallback candidates. These are live-market observations; no orders are placed.",
                 style=MaterialTheme.typography.bodySmall,color=subdued)
         }
         if(state.fixed.isEmpty()) item {
@@ -211,7 +212,7 @@ private fun ForecastScreen(state:ScanState) {
                     Text("${row.signal.symbol} · ${row.signal.strategy}",fontWeight=FontWeight.SemiBold)
                     Text("Research score: ${"%.2f".format(row.adjustedScore)} · Calibrated samples: ${row.evidenceCount}",
                         style=MaterialTheme.typography.bodySmall)
-                    Text("Paper target ₹${money(row.signal.target)} · stop ₹${money(row.signal.stop)}",
+                    Text("Estimated cover target ₹${money(row.signal.target)} · BUY stop ₹${money(row.signal.stop)}",
                         style=MaterialTheme.typography.bodySmall,color=subdued)
                 }
             }
@@ -223,6 +224,10 @@ private fun ForecastScreen(state:ScanState) {
 private fun SettingsScreen(state:ScanState,start:()->Unit,stop:()->Unit) {
     val context=LocalContext.current
     val vault=remember { ShortRuntime.token(context) }
+    val prefs=remember { ShortPreferences(context) }
+    var controls by remember { mutableStateOf(prefs.load()) }
+    var staticIpEntry by remember { mutableStateOf(controls.staticIp) }
+    var ipNote by remember { mutableStateOf("") }
     var token by remember { mutableStateOf("") }
     var configured by remember { mutableStateOf(vault.configured()) }
     var note by remember { mutableStateOf("") }
@@ -262,6 +267,16 @@ private fun SettingsScreen(state:ScanState,start:()->Unit,stop:()->Unit) {
                     Text("NSE LTP discovery: full stored equity master")
                     Text("Groww budgets: live 3/s, 90/min; history 2/s, 90/min",
                         style=MaterialTheme.typography.bodySmall,color=subdued)
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Forecast background scanner",fontWeight=FontWeight.SemiBold)
+                            Text("Fixed continues independently when Forecast is off",
+                                style=MaterialTheme.typography.bodySmall,color=subdued)
+                        }
+                        Switch(checked=controls.forecastScannerEnabled,onCheckedChange={ enabled->
+                            prefs.saveForecastScanner(enabled);controls=prefs.load()
+                        })
+                    }
                     Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
                         Button(onClick=start,enabled=configured&&!state.running){Text("Start")}
                         OutlinedButton(onClick=stop,enabled=state.running){Text("Stop")}
@@ -271,12 +286,74 @@ private fun SettingsScreen(state:ScanState,start:()->Unit,stop:()->Unit) {
         }
         item {
             Card(Modifier.fillMaxWidth()) {
-                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(6.dp)) {
-                    Text("Execution safety",style=MaterialTheme.typography.titleMedium)
-                    Text("PAPER ONLY · Live order endpoints not compiled into this APK",
+                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
+                    Text("Groww-whitelisted static IP",style=MaterialTheme.typography.titleMedium)
+                    Text("Enter the public static IP registered with Groww. Verification compares it with the phone's current outgoing public IP.",
+                        style=MaterialTheme.typography.bodySmall,color=subdued)
+                    OutlinedTextField(value=staticIpEntry,onValueChange={staticIpEntry=it},
+                        label={Text("Static public IPv4 or IPv6")},singleLine=true,
+                        modifier=Modifier.fillMaxWidth())
+                    Row(horizontalArrangement=Arrangement.spacedBy(8.dp)) {
+                        Button(onClick={
+                            try {
+                                prefs.saveIp(staticIpEntry);controls=prefs.load()
+                                ipNote="Static IP saved. Verify against current public IP."
+                            } catch(ex:Exception){ipNote=ex.message?:"Invalid IP address"}
+                        }) { Text("Save IP") }
+                        OutlinedButton(onClick={
+                            scope.launch {
+                                ipNote="Checking outgoing IP..."
+                                try {
+                                    val observed=IpVerifier.currentPublicIp()
+                                    val matches=observed==controls.staticIp && observed.isNotBlank()
+                                    prefs.saveVerification(observed,matches);controls=prefs.load()
+                                    ipNote=if(matches) "Verified: $observed matches Groww static IP"
+                                        else "Mismatch: observed $observed; saved ${controls.staticIp.ifBlank { "not set" }}"
+                                } catch(ex:Exception) {
+                                    prefs.invalidateIp();controls=prefs.load()
+                                    ipNote="IP verification failed: ${ex.message?:"connection error"}"
+                                }
+                            }
+                        },enabled=controls.staticIp.isNotBlank()) { Text("Verify IP") }
+                    }
+                    Text(if(controls.staticIpVerified) "IP verified for this session" else "IP not verified",
+                        color=if(controls.staticIpVerified) MaterialTheme.colorScheme.primary else downRed)
+                    if(ipNote.isNotBlank()) Text(ipNote,style=MaterialTheme.typography.bodySmall)
+                }
+            }
+        }
+        item {
+            Card(Modifier.fillMaxWidth()) {
+                Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
+                    Text("Execution controls",style=MaterialTheme.typography.titleMedium)
+                    Text("OBSERVE ONLY · Live market data; no simulated trades; no broker orders",
                         color=downRed,fontWeight=FontWeight.Bold)
-                    Text("Short SELL MIS, protective BUY-to-cover OCO, fill reconciliation, broker eligibility, and forced 14:55 IST exit require authenticated broker integration testing before a live-release build.",
+                    Text("ARM and auto-short remain disabled in this build until verified short SELL MIS, protective BUY-to-cover, fill reconciliation and same-day square-off are implemented.",
                         style=MaterialTheme.typography.bodySmall)
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                        Text("ARM · allow broker execution",modifier=Modifier.weight(1f))
+                        Switch(checked=controls.armed && ShortExecutionGate.canArm(configured,controls),
+                            onCheckedChange=null,enabled=false)
+                    }
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                        Text("Fixed auto-SHORT",modifier=Modifier.weight(1f))
+                        Switch(checked=controls.fixedAutoShortEnabled && ShortExecutionGate.canAutoShort(configured,controls,true),
+                            onCheckedChange=null,enabled=false)
+                    }
+                    Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
+                        Text("Forecast auto-SHORT",modifier=Modifier.weight(1f))
+                        Switch(checked=controls.forecastAutoShortEnabled && ShortExecutionGate.canAutoShort(configured,controls,false),
+                            onCheckedChange=null,enabled=false)
+                    }
+                    Text("Per-position capital budget: ₹${controls.riskBudgetRupees}",fontWeight=FontWeight.SemiBold)
+                    Slider(value=controls.riskBudgetRupees.toFloat(),onValueChange={ value->
+                        val rounded=(value/10000).toInt().coerceIn(1,20)*10000
+                        if(rounded!=controls.riskBudgetRupees) {
+                            prefs.saveBudget(rounded);controls=prefs.load()
+                        }
+                    },valueRange=10000f..200000f,steps=18)
+                    Text("Budget is a saved preference only; no order sizing occurs in observation mode.",
+                        style=MaterialTheme.typography.bodySmall,color=subdued)
                     Text("Existing Multify LONG trades and Multify learning data are never used.",
                         style=MaterialTheme.typography.bodySmall,color=subdued)
                 }
