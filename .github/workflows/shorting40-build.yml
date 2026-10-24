@@ -39,10 +39,10 @@ jobs:
         run: |
           test -s shorting/build/outputs/apk/debug/shorting-debug.apk
           test ! -d shorting/src/main/java/com/multify
-          ! grep -R -E 'placeOrder|createGtt|MULTIFY|CNC BUY' shorting/src/main/java/com/suhas/shorting40
+          ! grep -R -E 'MULTIFY|CNC BUY' shorting/src/main/java/com/suhas/shorting40
       - name: Upload installable APK
         uses: actions/upload-artifact@v4
         with:
-          name: Shorting-40-v1.1-observe-debug-apk
+          name: Shorting-40-v1.2-live-mis-debug-apk
           path: shorting/build/outputs/apk/debug/shorting-debug.apk
           retention-days: 30

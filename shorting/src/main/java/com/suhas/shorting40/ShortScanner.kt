@@ -306,6 +306,7 @@ object ShortRuntime {
             }.sortedWith(compareByDescending<Signal> { it.confidence }
                 .thenByDescending { it.familyScore })
             val oldSymbols=state.value.fixed.map { it.symbol }.toSet()
+            val oldForecastSymbols=state.value.forecast.map { it.signal.symbol }.toSet()
             val newFixed=approved.filter { it.symbol !in oldSymbols }
             // Forecast is a separate calibration product; do NOT pretend old LONG wins prove
             // that a short model works. Until a properly labeled short outcome set exists,
@@ -320,6 +321,17 @@ object ShortRuntime {
                 fixed=approved,forecast=forecast,
                 totalObservations=observations.values.sumOf { it.size })
             if(newFixed.isNotEmpty()) alert(context,newFixed)
+            // The user must enable ARM AND the specific auto-short switch.
+            // Preference changes never retroactively submit past observations.
+            val controls=ShortPreferences(context).load()
+            val newForecast=forecast.map { it.signal }.filter { it.symbol !in oldForecastSymbols }
+            if(controls.armed) {
+                if(controls.fixedAutoShortEnabled) {
+                    newFixed.firstOrNull()?.let { ShortBrokerExecution.consider(context,it,"FIXED") }
+                } else if(controls.forecastAutoShortEnabled) {
+                    newForecast.firstOrNull()?.let { ShortBrokerExecution.consider(context,it,"FORECAST") }
+                }
+            }
             current.forEach { (k,v)->openLtps.putIfAbsent(k,v) }
             previous=current
         } catch(ex:Exception) {
@@ -345,10 +357,16 @@ object ShortRuntime {
 class ShortScanService:Service() {
     private val scope=CoroutineScope(SupervisorJob()+Dispatchers.IO)
     private var work:Job?=null
+    private var protectionMonitor:Job?=null
     override fun onBind(intent:Intent?):IBinder?=null
     override fun onStartCommand(intent:Intent?,flags:Int,startId:Int):Int {
-        if(intent?.action=="STOP") { work?.cancel();ShortRuntime.state.value=
-            ShortRuntime.state.value.copy(running=false,status="Stopped");stopSelf();return START_NOT_STICKY }
+        if(intent?.action=="STOP") {
+            work?.cancel()
+            ShortRuntime.state.value=ShortRuntime.state.value.copy(running=false,
+                status=if(ShortBrokerExecution.active(this)) "Scanner stopped · live short protection remains active" else "Stopped")
+            if(!ShortBrokerExecution.active(this)) { protectionMonitor?.cancel();stopSelf() }
+            return START_NOT_STICKY
+        }
         val manager=getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         manager.createNotificationChannel(NotificationChannel("shorting40_service",
             "Market scanner",NotificationManager.IMPORTANCE_LOW))
@@ -358,6 +376,12 @@ class ShortScanService:Service() {
             .setContentText("NSE LTP discovery every 150 seconds · no live orders")
             .setOngoing(true).build()
         startForeground(4040,notification)
+        if(protectionMonitor?.isActive!=true) protectionMonitor=scope.launch {
+            while(isActive) {
+                ShortBrokerExecution.monitor(applicationContext)
+                delay(10000)
+            }
+        }
         if(work?.isActive!=true) work=scope.launch {
             ShortRuntime.state.value=ShortRuntime.state.value.copy(running=true)
             // Match Fixed's nominal 150-second start-to-start gate. If a scan runs
@@ -372,7 +396,8 @@ class ShortScanService:Service() {
         return START_NOT_STICKY
     }
     override fun onDestroy() {
-        work?.cancel();ShortRuntime.state.value=ShortRuntime.state.value.copy(running=false)
+        work?.cancel();protectionMonitor?.cancel()
+        ShortRuntime.state.value=ShortRuntime.state.value.copy(running=false)
         super.onDestroy()
     }
 }

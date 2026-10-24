@@ -47,13 +47,22 @@ class ShortFactorEngineTest {
         assertTrue(ShortRuntime.scanningAllowed(LocalDateTime.of(2026,10,26,9,15)))
         assertFalse(ShortRuntime.scanningAllowed(LocalDateTime.of(2026,10,26,15,30)))
     }
-    @Test fun observingCannotAccidentallyEnableLiveShortOrders() {
-        val allSwitches=ShortControls(
-            staticIp="203.0.113.10",observedIp="203.0.113.10",staticIpVerified=true,
-            armed=true,fixedAutoShortEnabled=true,forecastAutoShortEnabled=true)
-        assertFalse(ShortExecutionGate.LIVE_BROKER_EXECUTION_AVAILABLE)
-        assertFalse(ShortExecutionGate.canArm(tokenConfigured=true,controls=allSwitches))
-        assertFalse(ShortExecutionGate.canAutoShort(true,allSwitches,fixed=true))
-        assertFalse(ShortExecutionGate.canAutoShort(true,allSwitches,fixed=false))
+    @Test fun executionSwitchesStartOffAndRequireExplicitOptIn() {
+        val defaults=ShortControls(staticIp="203.0.113.10",staticIpVerified=true)
+        assertFalse(defaults.armed)
+        assertFalse(defaults.fixedAutoShortEnabled)
+        assertFalse(defaults.forecastAutoShortEnabled)
+        assertFalse(ShortExecutionGate.canAutoShort(true,defaults,true))
+        assertFalse(ShortExecutionGate.canAutoShort(true,defaults,false))
+        val optIn=defaults.copy(armed=true,fixedAutoShortEnabled=true,
+            forecastAutoShortEnabled=true)
+        assertTrue(ShortExecutionGate.canAutoShort(true,optIn,true))
+        assertTrue(ShortExecutionGate.canAutoShort(true,optIn,false))
+        assertFalse(ShortExecutionGate.canAutoShort(false,optIn,true))
+    }
+    @Test fun liveOrderReferenceAndCurrencyFormatting() {
+        val r=GrowwShortBroker.ref()
+        assertTrue(r.matches(Regex("[A-Z0-9]{8,20}")))
+        assertEquals("106.35",GrowwShortBroker.format(106.351))
     }
 }

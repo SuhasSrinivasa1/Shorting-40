@@ -5,7 +5,7 @@ from the v7.7.2/v7.7.3 Multify architecture. The original Multify repository is
 not changed. Only the `:shorting` module compiles or ships; legacy `:app` is
 kept in this repository as an unbuilt reference for component-by-component parity.
 
-## Observation-first APK: live data, no simulated positions or orders
+## Observation-first APK with opt-in live short order submission
 
 - Exactly 40 deterministic bearish features, in families of 14/13/13.
 - Full NSE symbol-master LTP discovery, 50 per batch, nominal 150-second loop.
@@ -16,15 +16,23 @@ kept in this repository as an unbuilt reference for component-by-component parit
 - Three visible tabs: Fixed, Forecast (uncalibrated research), Settings.
 - Forecast background scanner can be independently switched on/off; Fixed unaffected.
 - Manually entered Groww-whitelisted static IP and real outgoing-IP verification.
-- ARM, Fixed auto-SHORT and Forecast auto-SHORT switches are visible but locked
-  pending verified broker execution. This is **not** paper trading: no fictional
-  positions are opened, recorded or simulated.
+- ARM, Fixed auto-SHORT and Forecast auto-SHORT switches are fully user-controllable
+  and OFF by default. When ARM and a mode's auto-SHORT switch are enabled,
+  the app can submit real NSE CASH/MIS MARKET SELL orders on new PRIMARY signals.
+  A filled short receives broker-hosted CASH/MIS OCO BUY target and BUY stop.
+  The app stores entry references, checks fills, monitors the net position,
+  tightens stops and requests intraday BUY-to-cover at 14:55 IST.
+  No simulated positions or trades are created.
 - Daily Groww API access token encrypted by Android Keystore.
 - No Multify notification listener, LONG/CNC trade execution, GTT or order
   submission code is built in the new module.
 
-**Important:** This release is installable but is **NOT** production-ready for
-live brokerage orders. It intentionally cannot send SELL orders.
+**Important:** This release is installable and can submit LIVE brokerage orders
+if the user enables ARM and auto-SHORT. It has NOT been validated against
+the user's actual broker account, and it is **NOT** production-validated.
+Android can be suspended, the token or IP can expire, Groww can reject or
+partially fill orders, and OCO creation can be accepted despite an HTTP timeout.
+Uncertain protection therefore raises an urgent notification for reconciliation.
 The proposed 40-factor thresholds have not passed historical short-specific
 backtests or broker integration tests. Forecast's adaptive learning is still
 blocked pending real short outcomes. NSE holidays, corporate actions and live

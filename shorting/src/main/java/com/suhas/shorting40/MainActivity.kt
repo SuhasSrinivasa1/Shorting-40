@@ -328,22 +328,25 @@ private fun SettingsScreen(state:ScanState,start:()->Unit,stop:()->Unit) {
                     Text("Execution controls",style=MaterialTheme.typography.titleMedium)
                     Text("OBSERVE ONLY · Live market data; no simulated trades; no broker orders",
                         color=downRed,fontWeight=FontWeight.Bold)
-                    Text("ARM and auto-short remain disabled in this build until verified short SELL MIS, protective BUY-to-cover, fill reconciliation and same-day square-off are implemented.",
+                    Text("All execution switches start OFF. When ARM and an auto-SHORT switch are ON, matching qualifying signals may submit real Groww MIS SELL orders; protective BUY orders and intraday exit are mandatory.",
                         style=MaterialTheme.typography.bodySmall)
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                         Text("ARM · allow broker execution",modifier=Modifier.weight(1f))
-                        Switch(checked=controls.armed && ShortExecutionGate.canArm(configured,controls),
-                            onCheckedChange=null,enabled=false)
+                        Switch(checked=controls.armed,onCheckedChange={ enabled->
+                            prefs.saveArm(enabled);controls=prefs.load()
+                        })
                     }
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                         Text("Fixed auto-SHORT",modifier=Modifier.weight(1f))
-                        Switch(checked=controls.fixedAutoShortEnabled && ShortExecutionGate.canAutoShort(configured,controls,true),
-                            onCheckedChange=null,enabled=false)
+                        Switch(checked=controls.fixedAutoShortEnabled,onCheckedChange={ enabled->
+                            prefs.saveFixedAutoShort(enabled);controls=prefs.load()
+                        })
                     }
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                         Text("Forecast auto-SHORT",modifier=Modifier.weight(1f))
-                        Switch(checked=controls.forecastAutoShortEnabled && ShortExecutionGate.canAutoShort(configured,controls,false),
-                            onCheckedChange=null,enabled=false)
+                        Switch(checked=controls.forecastAutoShortEnabled,onCheckedChange={ enabled->
+                            prefs.saveForecastAutoShort(enabled);controls=prefs.load()
+                        })
                     }
                     Text("Per-position capital budget: ₹${controls.riskBudgetRupees}",fontWeight=FontWeight.SemiBold)
                     Slider(value=controls.riskBudgetRupees.toFloat(),onValueChange={ value->

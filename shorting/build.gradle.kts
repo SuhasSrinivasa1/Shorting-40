@@ -12,8 +12,8 @@ android {
         applicationId = "com.suhas.shorting40"
         minSdk = 26
         targetSdk = 35
-        versionCode = 2
-        versionName = "1.1.0-observe"
+        versionCode = 3
+        versionName = "1.2.0-live-mis"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
     buildTypes {

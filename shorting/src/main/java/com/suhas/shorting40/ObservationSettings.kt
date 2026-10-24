@@ -20,14 +20,9 @@ data class ShortControls(
     val riskBudgetRupees: Int = 20000
 )
 
-/**
- * Deliberately rejects every auto-entry until CASH MIS short order protection is implemented
- * and integration-tested. A settings toggle must never silently mean 'trading live'.
- */
 object ShortExecutionGate {
-    const val LIVE_BROKER_EXECUTION_AVAILABLE = false
     fun canArm(tokenConfigured: Boolean, controls: ShortControls): Boolean =
-        LIVE_BROKER_EXECUTION_AVAILABLE && tokenConfigured && controls.staticIpVerified &&
+        tokenConfigured && controls.staticIpVerified &&
             controls.staticIp.isNotBlank()
     fun canAutoShort(tokenConfigured: Boolean, controls: ShortControls, fixed: Boolean): Boolean =
         canArm(tokenConfigured, controls) && controls.armed &&
@@ -56,6 +51,15 @@ class ShortPreferences(context: Context) {
     }
     fun saveForecastScanner(enabled:Boolean) {
         prefs.edit().putBoolean("forecast_scanner",enabled).apply()
+    }
+    fun saveArm(enabled:Boolean) {
+        prefs.edit().putBoolean("armed",enabled).apply()
+    }
+    fun saveFixedAutoShort(enabled:Boolean) {
+        prefs.edit().putBoolean("fixed_auto_short",enabled).apply()
+    }
+    fun saveForecastAutoShort(enabled:Boolean) {
+        prefs.edit().putBoolean("forecast_auto_short",enabled).apply()
     }
     fun saveBudget(rupees:Int) {
         require(rupees in 10000..200000 && rupees%10000==0)
