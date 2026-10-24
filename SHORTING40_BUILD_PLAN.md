@@ -1,0 +1,47 @@
+# Shorting 40
+
+Separate Android application and unique install ID `com.suhas.shorting40`, derived
+from the v7.7.2/v7.7.3 Multify architecture. The original Multify repository is
+not changed. Only the `:shorting` module compiles or ships; legacy `:app` is
+kept in this repository as an unbuilt reference for component-by-component parity.
+
+## First APK: paper-only engineering verification
+
+- Exactly 40 deterministic bearish features, in families of 14/13/13.
+- Full NSE symbol-master LTP discovery, 50 per batch, nominal 150-second loop.
+- Shortlist: 20 continuing decliners + 8 fresh turns + 12 bounce candidates +
+  8 rotating liquid/negative-session names, with fallbacks to 48.
+- Current quotes and up to four calendar days of 15-minute Groww candles.
+- Quality gates, repeated PRIMARY confirmation and theoretical sell/cover prices.
+- Three visible tabs: Fixed, Forecast (uncalibrated research), Settings.
+- Daily Groww API access token encrypted by Android Keystore.
+- No Multify notification listener, LONG/CNC trade execution, GTT or order
+  submission code is built in the new module.
+
+**Important:** This release is installable but is **NOT** production-ready for
+live brokerage orders. It intentionally cannot send SELL orders.
+The proposed 40-factor thresholds have not passed historical short-specific
+backtests or broker integration tests. Forecast's adaptive learning is still
+blocked pending real short outcomes. NSE holidays, corporate actions and live
+short-eligibility checks need additional work. The service uses a user-initiated
+foreground scan and Android may still terminate it under some device conditions.
+
+## Live release acceptance gates
+
+1. Cash MIS short eligibility checks and daily exchange holiday gates.
+2. Margin sizing and portfolio-wide loss budget before **any** SELL.
+3. Verified negative-position OCO: immediate BUY stop, BUY target, idempotent
+   order references, partial fills and crash/restart reconciliation.
+4. Monotonic upside protection: ShortTrail may tighten but never loosen stop.
+5. 14:55 IST forced BUY-to-cover and emergency broker failure escalation.
+6. Conservative shared-account quota if Multify and Shorting-40 run together.
+7. Historical short-specific backtest including slippage, circuits and costs,
+   several paper sessions, and separate Forecast calibration.
+8. Stable release signing key stored securely in GitHub Actions secrets (not repo).
+
+## Build
+
+GitHub Actions: **Shorting 40 Android — tests and installable paper APK**.
+Run `gradle :shorting:testDebugUnitTest :shorting:assembleDebug` with Java 17,
+Android SDK 35 and Gradle 8.9. APK artifact path:
+`shorting/build/outputs/apk/debug/shorting-debug.apk`.
