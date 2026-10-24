@@ -31,6 +31,19 @@ object ShortExecutionGate {
 
 class ShortPreferences(context: Context) {
     private val prefs=context.getSharedPreferences("shorting40_settings",Context.MODE_PRIVATE)
+    init {
+        // Apply the requested safe defaults once, including to upgrades from an earlier APK.
+        // Credentials and IP settings are preserved; every user-facing toggle remains editable.
+        if(!prefs.getBoolean("safe_defaults_v2_applied",false)) {
+            prefs.edit()
+                .putBoolean("forecast_scanner",false)
+                .putBoolean("fixed_auto_short",false)
+                .putBoolean("forecast_auto_short",false)
+                .putBoolean("armed",false)
+                .putBoolean("safe_defaults_v2_applied",true)
+                .apply()
+        }
+    }
     fun load()=ShortControls(
         staticIp=prefs.getString("static_ip","").orEmpty(),
         observedIp=prefs.getString("observed_ip","").orEmpty(),
