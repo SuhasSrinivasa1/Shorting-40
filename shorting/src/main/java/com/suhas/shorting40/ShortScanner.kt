@@ -221,7 +221,7 @@ object ShortRuntime {
         return names
     }
     private data class Candidate(val symbol:String,val price:Double,val pulse:Double,val session:Double)
-    private fun shortlist(current:Map<String,Double>):Pair<List<String>,Set<String>> {
+    private fun shortlist(current:Map<String,Double>, now:LocalDateTime):Pair<List<String>,Set<String>> {
         val movers=current.mapNotNull { (symbol,px)->
             val p=previous[symbol]; val o=openLtps[symbol]
             if(p==null||o==null||px<=100) null else
@@ -236,8 +236,15 @@ object ShortRuntime {
         val inShortlist=mutableListOf<String>()
         (ongoing+fresh+bounce).forEach { if(it.symbol !in inShortlist) inShortlist+=it.symbol }
         val discovered=inShortlist.toSet()
-        val liquidRotation=movers.filter { it.session<0 && it.symbol !in discovered }
-            .sortedBy { it.symbol }.take(8).map { it.symbol }
+        // Deterministically rotate the eight fallback slots every 30 minutes.
+        // LTP-only discovery cannot prove liquidity; detailed quote quality must decide.
+        val rotationPool=movers.filter { it.session<0 && it.symbol !in discovered }
+            .sortedBy { it.symbol }.map { it.symbol }
+        val slot=(now.hour*60+now.minute)/30
+        val liquidRotation=if(rotationPool.isEmpty()) emptyList() else
+            (0 until minOf(8,rotationPool.size)).map { index->
+                rotationPool[(slot*8+index)%rotationPool.size]
+            }
         val remaining=movers.filter { it.symbol !in (inShortlist+liquidRotation) }
             .sortedByDescending { -.65*it.session-.35*it.pulse }.map { it.symbol }
         return (inShortlist+liquidRotation+remaining).distinct().take(48) to discovered
@@ -276,7 +283,7 @@ object ShortRuntime {
                     masterCount=master.size,coverage=coverage,lastScanMs=System.currentTimeMillis())
                 return
             }
-            val (candidates,discovered)=shortlist(current)
+            val (candidates,discovered)=shortlist(current,now)
             val bearishBreadth=current.count { (s,p)->openLtps[s]?.let { p<it }?:false } >
                 current.size*.55
             val rows=mutableListOf<Signal>()
