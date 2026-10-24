@@ -89,7 +89,7 @@ fun Shorting40App(start:()->Unit, stop:()->Unit) {
             Surface(tonalElevation=2.dp) {
                 Column(Modifier.fillMaxWidth().padding(18.dp)) {
                     Text("SHORTING 40",style=MaterialTheme.typography.titleLarge,fontWeight=FontWeight.Bold)
-                    Text("Intraday NSE · live observation · 40 bearish factors",
+                    Text("Intraday NSE · live market signals · optional broker execution",
                         style=MaterialTheme.typography.bodySmall,color=subdued)
                 }
             }
@@ -326,7 +326,7 @@ private fun SettingsScreen(state:ScanState,start:()->Unit,stop:()->Unit) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(9.dp)) {
                     Text("Execution controls",style=MaterialTheme.typography.titleMedium)
-                    Text("OBSERVE ONLY · Live market data; no simulated trades; no broker orders",
+                    Text("LIVE BROKER EXECUTION · Real Groww orders when you explicitly enable them",
                         color=downRed,fontWeight=FontWeight.Bold)
                     Text("All execution switches start OFF. When ARM and an auto-SHORT switch are ON, matching qualifying signals may submit real Groww MIS SELL orders; protective BUY orders and intraday exit are mandatory.",
                         style=MaterialTheme.typography.bodySmall)
@@ -355,7 +355,7 @@ private fun SettingsScreen(state:ScanState,start:()->Unit,stop:()->Unit) {
                             prefs.saveBudget(rounded);controls=prefs.load()
                         }
                     },valueRange=10000f..200000f,steps=18)
-                    Text("Budget is a saved preference only; no order sizing occurs in observation mode.",
+                    Text("Per-position notional budget used for sizing live MIS orders. Keep execution OFF until you have checked the settings.",
                         style=MaterialTheme.typography.bodySmall,color=subdued)
                     Text("Existing Multify LONG trades and Multify learning data are never used.",
                         style=MaterialTheme.typography.bodySmall,color=subdued)

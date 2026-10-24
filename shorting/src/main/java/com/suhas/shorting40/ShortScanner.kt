@@ -186,7 +186,7 @@ private class GrowwMarketClient(private val token: String) {
     }
 }
 
-/** App-local scanner and observable state. No order placement exists in this release. */
+/** App-local scanner and observable state, with opt-in live short execution. */
 object ShortRuntime {
     val state=MutableStateFlow(ScanState())
     private val india=ZoneId.of("Asia/Kolkata")
@@ -328,7 +328,8 @@ object ShortRuntime {
             if(controls.armed) {
                 if(controls.fixedAutoShortEnabled) {
                     newFixed.firstOrNull()?.let { ShortBrokerExecution.consider(context,it,"FIXED") }
-                } else if(controls.forecastAutoShortEnabled) {
+                }
+                if(controls.forecastAutoShortEnabled) {
                     newForecast.firstOrNull()?.let { ShortBrokerExecution.consider(context,it,"FORECAST") }
                 }
             }
@@ -373,7 +374,7 @@ class ShortScanService:Service() {
         val notification:Notification=NotificationCompat.Builder(this,"shorting40_service")
             .setSmallIcon(android.R.drawable.ic_popup_sync)
             .setContentTitle("Shorting 40 · live market scanner")
-            .setContentText("NSE LTP discovery every 150 seconds · no live orders")
+            .setContentText("NSE LTP discovery every 150 seconds · opt-in live MIS shorts")
             .setOngoing(true).build()
         startForeground(4040,notification)
         if(protectionMonitor?.isActive!=true) protectionMonitor=scope.launch {
