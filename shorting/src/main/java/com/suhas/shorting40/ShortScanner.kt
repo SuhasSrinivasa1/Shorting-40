@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.os.Build
 import android.os.IBinder
+import android.os.SystemClock
 import android.util.Base64
 import androidx.core.app.NotificationCompat
 import com.google.gson.Gson
@@ -359,7 +360,14 @@ class ShortScanService:Service() {
         startForeground(4040,notification)
         if(work?.isActive!=true) work=scope.launch {
             ShortRuntime.state.value=ShortRuntime.state.value.copy(running=true)
-            while(isActive) { ShortRuntime.scan(applicationContext);delay(150000) }
+            // Match Fixed's nominal 150-second start-to-start gate. If a scan runs
+            // longer than the interval, start again on the next worker check;
+            // never run two scans concurrently.
+            while(isActive) {
+                val started=SystemClock.elapsedRealtime()
+                ShortRuntime.scan(applicationContext)
+                delay((150000L-(SystemClock.elapsedRealtime()-started)).coerceAtLeast(1000L))
+            }
         }
         return START_NOT_STICKY
     }
