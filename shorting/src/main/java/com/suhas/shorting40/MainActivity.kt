@@ -144,7 +144,7 @@ private fun FixedScreen(state:ScanState,start:()->Unit,stop:()->Unit) {
             Spacer(Modifier.height(8.dp))
             Text("Fixed Short V1 · PRIMARY",style=MaterialTheme.typography.titleMedium,
                 fontWeight=FontWeight.SemiBold)
-            Text("Two confirmations for market discoveries; three for fallback candidates. These are live-market observations; no orders are placed.",
+            Text("Two confirmations for market discoveries; three for fallback candidates. When enabled in Settings, qualifying PRIMARY signals can submit real Groww MIS orders.",
                 style=MaterialTheme.typography.bodySmall,color=subdued)
         }
         if(state.fixed.isEmpty()) item {
@@ -193,7 +193,7 @@ private fun ForecastScreen(state:ScanState) {
             Card(Modifier.fillMaxWidth()) {
                 Column(Modifier.padding(16.dp),verticalArrangement=Arrangement.spacedBy(5.dp)) {
                     Text("Forecast Short · calibration",style=MaterialTheme.typography.titleMedium)
-                    Text("Research-only ranking. The new short engine has no validated downside-outcome history, so adaptive target expansion and live execution are disabled.",
+                    Text("Research-only ranking: the short engine has no validated downside-outcome history. Real orders can be submitted only if ARM and Forecast auto-SHORT are enabled in Settings.",
                         style=MaterialTheme.typography.bodyMedium)
                     Text("Current PRIMARY observations: ${state.totalObservations}",
                         style=MaterialTheme.typography.bodySmall,color=subdued)
@@ -265,12 +265,12 @@ private fun SettingsScreen(state:ScanState,start:()->Unit,stop:()->Unit) {
                     Text("Detailed stocks: max 48")
                     Text("Historical candles: 15-minute / 4 calendar days")
                     Text("NSE LTP discovery: full stored equity master")
-                    Text("Groww budgets: live 3/s, 90/min; history 2/s, 90/min",
+                    Text("Groww API limits: market data 10/s, 300/min; orders 10/s, 250/min; non-trading 20/s, 500/min. Pacing is app-local; no cross-app quota sharing.",
                         style=MaterialTheme.typography.bodySmall,color=subdued)
                     Row(Modifier.fillMaxWidth(),horizontalArrangement=Arrangement.SpaceBetween) {
                         Column(Modifier.weight(1f)) {
-                            Text("Forecast background scanner",fontWeight=FontWeight.SemiBold)
-                            Text("Fixed continues independently when Forecast is off",
+                            Text("Show Forecast rankings",fontWeight=FontWeight.SemiBold)
+                            Text("Fixed scanning and execution settings remain independent",
                                 style=MaterialTheme.typography.bodySmall,color=subdued)
                         }
                         Switch(checked=controls.forecastScannerEnabled,onCheckedChange={ enabled->

@@ -13,7 +13,7 @@ data class ShortControls(
     val staticIp: String = "",
     val observedIp: String = "",
     val staticIpVerified: Boolean = false,
-    val forecastScannerEnabled: Boolean = true,
+    val forecastScannerEnabled: Boolean = false,
     val fixedAutoShortEnabled: Boolean = false,
     val forecastAutoShortEnabled: Boolean = false,
     val armed: Boolean = false,
@@ -36,7 +36,7 @@ class ShortPreferences(context: Context) {
         observedIp=prefs.getString("observed_ip","").orEmpty(),
         staticIpVerified=prefs.getBoolean("ip_verified",false) &&
             System.currentTimeMillis()-prefs.getLong("ip_verified_at",0) in 0..300000,
-        forecastScannerEnabled=prefs.getBoolean("forecast_scanner",true),
+        forecastScannerEnabled=prefs.getBoolean("forecast_scanner",false),
         fixedAutoShortEnabled=prefs.getBoolean("fixed_auto_short",false),
         forecastAutoShortEnabled=prefs.getBoolean("forecast_auto_short",false),
         armed=prefs.getBoolean("armed",false),

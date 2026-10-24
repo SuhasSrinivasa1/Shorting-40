@@ -96,11 +96,8 @@ class AccessTokenVault(context: Context) {
     fun configured(): Boolean = prefs.contains("token")
 }
 
-/**
- * Per-process limits are intentionally LOWER than the old long app (3/s and 90/min)
- * to reserve shared Groww live-data headroom if both APKs are open. A central
- * account-wide limiter is still required before live parallel auto-trading.
- */
+/** Enforces Groww's published market-data ceiling within this app only.
+ * No quota is reserved for, or coordinated with, any other application. */
 private class ApiPacer(private val perSecond: Int, private val perMinute: Int) {
     private val calls = ArrayDeque<Long>()
     suspend fun acquire() {
@@ -117,11 +114,11 @@ private class ApiPacer(private val perSecond: Int, private val perMinute: Int) {
     }
 }
 
+private val shorting40MarketDataPacer = ApiPacer(10,300)
+
 private class GrowwMarketClient(private val token: String) {
     private val client=OkHttpClient.Builder().connectTimeout(8,TimeUnit.SECONDS)
         .readTimeout(15,TimeUnit.SECONDS).retryOnConnectionFailure(true).build()
-    private val livePacer=ApiPacer(3,90)
-    private val historicalPacer=ApiPacer(2,90)
     private fun json(url:String): JsonObject {
         val request=Request.Builder().url(url).header("Authorization","Bearer $token")
             .header("Accept","application/json").header("X-API-VERSION","1.0").build()

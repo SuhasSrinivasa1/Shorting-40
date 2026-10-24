@@ -14,7 +14,7 @@ kept in this repository as an unbuilt reference for component-by-component parit
 - Current quotes and up to four calendar days of 15-minute Groww candles.
 - Quality gates, repeated PRIMARY confirmation and theoretical sell/cover prices.
 - Three visible tabs: Fixed, Forecast (uncalibrated research), Settings.
-- Forecast background scanner can be independently switched on/off; Fixed unaffected.
+- Forecast ranking switch defaults OFF; Fixed scanning and execution controls remain independent.
 - Manually entered Groww-whitelisted static IP and real outgoing-IP verification.
 - ARM, Fixed auto-SHORT and Forecast auto-SHORT switches are fully user-controllable
   and OFF by default. When ARM and a mode's auto-SHORT switch are enabled,
@@ -24,6 +24,7 @@ kept in this repository as an unbuilt reference for component-by-component parit
   tightens stops and requests intraday BUY-to-cover at 14:55 IST.
   No simulated positions or trades are created.
 - Daily Groww API access token encrypted by Android Keystore.
+- Groww request pacing within this app follows the documented category ceilings: market data 10 requests/second and 300/minute; orders 10/second and 250/minute; non-trading 20/second and 500/minute. No quota is reserved for or coordinated with another app.
 - No Multify notification listener, LONG/CNC trade execution, GTT or order
   submission code is built in the new module.
 
@@ -47,10 +48,9 @@ foreground scan and Android may still terminate it under some device conditions.
    order references, partial fills and crash/restart reconciliation.
 4. Monotonic upside protection: ShortTrail may tighten but never loosen stop.
 5. 14:55 IST forced BUY-to-cover and emergency broker failure escalation.
-6. Conservative shared-account quota if Multify and Shorting-40 run together.
-7. Historical short-specific backtest including slippage, circuits and costs,
+6. Historical short-specific backtest including slippage, circuits and costs,
    several live-observation sessions without placing orders, and separate Forecast calibration.
-8. Stable release signing key stored securely in GitHub Actions secrets (not repo).
+7. Stable release signing key stored securely in GitHub Actions secrets (not repo).
 
 ## Build
 

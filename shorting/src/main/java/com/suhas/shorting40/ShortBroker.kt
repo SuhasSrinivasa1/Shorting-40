@@ -68,12 +68,56 @@ internal class BrokerRejected(message:String):IllegalStateException(message)
 
 /** Real Groww REST API. Never retries a POST implicitly: network ambiguity is
  * resolved using the persistent unique reference ID and broker status API. */
+private class BlockingApiPacer(private val perSecond:Int, private val perMinute:Int) {
+    private val calls=java.util.ArrayDeque<Long>()
+    fun acquire() {
+        while(true) {
+            val waitMs=synchronized(calls) {
+                val now=System.currentTimeMillis()
+                while(calls.isNotEmpty() && now-calls.peekFirst()>60000L) calls.removeFirst()
+                val lastSecond=calls.count { now-it<1000L }
+                if(lastSecond<perSecond && calls.size<perMinute) {
+                    calls.addLast(now)
+                    0L
+                } else {
+                    val secondWait=calls.filter { now-it<1000L }.minOrNull()
+                        ?.let { (1000L-(now-it)).coerceAtLeast(1L) } ?: 1L
+                    val minuteWait=if(calls.size>=perMinute)
+                        (60001L-(now-calls.peekFirst())).coerceAtLeast(1L) else 1L
+                    max(secondWait,minuteWait)
+                }
+            }
+            if(waitMs==0L) return
+            Thread.sleep(waitMs)
+        }
+    }
+}
+
+/** Enforces Groww's documented per-category ceilings within Shorting-40 only. */
+private object GrowwBrokerApiPacing {
+    private val orders=BlockingApiPacer(10,250)
+    private val liveData=BlockingApiPacer(10,300)
+    private val nonTrading=BlockingApiPacer(20,500)
+    fun acquire(path:String) {
+        when {
+            path.startsWith("live-data/") -> liveData.acquire()
+            path.startsWith("order/create") ||
+                path.startsWith("order/cancel") ||
+                path.startsWith("order-advance/create") ||
+                path.startsWith("order-advance/cancel") ||
+                path.startsWith("order-advance/modify") -> orders.acquire()
+            else -> nonTrading.acquire()
+        }
+    }
+}
+
 internal class GrowwShortBroker(private val token: String) {
     private val client=OkHttpClient.Builder()
         .connectTimeout(7, TimeUnit.SECONDS)
         .readTimeout(9,TimeUnit.SECONDS)
         .retryOnConnectionFailure(false).build()
     private fun request(method:String,path:String,json:JsonObject?=null):JsonObject {
+        GrowwBrokerApiPacing.acquire(path)
         val body=json?.toString()?.toRequestBody("application/json".toMediaType())
         val builder=Request.Builder().url("https://api.groww.in/v1/"+path)
             .header("Authorization","Bearer "+token)
