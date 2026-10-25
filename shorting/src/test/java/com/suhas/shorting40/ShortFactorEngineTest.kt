@@ -60,6 +60,16 @@ class ShortFactorEngineTest {
         assertTrue(ShortExecutionGate.canAutoShort(true,optIn,false))
         assertFalse(ShortExecutionGate.canAutoShort(false,optIn,true))
     }
+    @Test fun noChangeRequiresTenMinutes() {
+        assertFalse(ShortExitWatch.stagnant(1000L,540000L,true))
+        assertTrue(ShortExitWatch.stagnant(1000L,601000L,true))
+        assertFalse(ShortExitWatch.stagnant(1000L,700000L,false))
+    }
+    @Test fun circuitUsesActualInstrumentPrice() {
+        assertTrue(ShortExitWatch.atBand(95.0,95.0))
+        assertFalse(ShortExitWatch.atBand(96.0,95.0))
+        assertFalse(ShortExitWatch.atBand(95.0,0.0))
+    }
     @Test fun liveOrderReferenceAndCurrencyFormatting() {
         val r=GrowwShortBroker.ref()
         assertTrue(r.matches(Regex("[A-Z0-9]{8,20}")))

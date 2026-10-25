@@ -52,6 +52,9 @@ internal data class ShortOwnedTrade(
     val effectiveStop: Double = 0.0,
     val bestPrice: Double = 0.0,
     val exitRef: String = "",
+    val stagnantPrice: Double = 0.0,
+    val stagnantSinceMs: Long = 0,
+    val lastWatchSampleMs: Long = 0,
     val lastError: String = ""
 ) {
     fun isOpen() = state !in setOf("CLOSED", "REJECTED", "UNFILLED")
@@ -65,6 +68,14 @@ internal data class BrokerOrderState(
 )
 
 internal class BrokerRejected(message:String):IllegalStateException(message)
+internal object ShortExitWatch {
+    const val WINDOW = 600_000L
+    fun stagnant(since:Long,now:Long,same:Boolean) = since>0 && same && now-since>=WINDOW
+    fun atBand(price:Double,limit:Double) = price>0 && limit>0 && kotlin.math.abs(price-limit)<=0.011
+}
+internal data class BrokerLiveQuote(val price:Double,val upper:Double,val lower:Double,
+    val offerQty:Double,val lastTradeMs:Long)
+
 
 /** Real Groww REST API. Never retries a POST implicitly: network ambiguity is
  * resolved using the persistent unique reference ID and broker status API. */
@@ -143,10 +154,14 @@ internal class GrowwShortBroker(private val token: String) {
     private fun JsonObject.string(key:String)=get(key)?.takeUnless { it.isJsonNull }?.asString.orEmpty()
     private fun JsonObject.int(key:String)=runCatching { get(key)?.asInt?:0 }.getOrDefault(0)
     private fun JsonObject.double(key:String)=runCatching { get(key)?.asDouble?:0.0 }.getOrDefault(0.0)
-    fun quote(symbol:String):Double {
+    fun fullQuote(symbol:String):BrokerLiveQuote {
         val p=request("GET","live-data/quote?exchange=NSE&segment=CASH&trading_symbol="+symbol)
-        return p.double("last_price").takeIf { it>100 && it.isFinite() }?:error("Invalid latest quote")
+        val price=p.double("last_price").takeIf { it>0 && it.isFinite() }?:error("Invalid latest quote")
+        return BrokerLiveQuote(price,p.double("upper_circuit_limit"),p.double("lower_circuit_limit"),
+            p.double("offer_quantity"),
+            runCatching { p.get("last_trade_time")?.asLong?:0L }.getOrDefault(0L))
     }
+    fun quote(symbol:String):Double=fullQuote(symbol).price
     fun availableCash():Double =
         request("GET","margins/detail/user").double("clear_cash")
     fun misQty(symbol:String):Int {
@@ -456,7 +471,45 @@ internal object ShortBrokerExecution {
                     " OCO="+oco+" with remaining short. Inspect Groww immediately.")
                 return@withContext
             }
-            val ltp=b.quote(t.symbol)
+            val live=b.fullQuote(t.symbol)
+            val ltp=live.price
+            // Only position management: never blocks Fixed/Forecast signal evaluation.
+            val nowMs=System.currentTimeMillis()
+            var observed=t
+            if(nowMs-t.lastWatchSampleMs>=60_000L) {
+                val same=t.stagnantSinceMs>0 && kotlin.math.abs(ltp-t.stagnantPrice)<0.005
+                observed=t.copy(stagnantPrice=ltp,
+                    stagnantSinceMs=if(same)t.stagnantSinceMs else nowMs,
+                    lastWatchSampleMs=nowMs)
+                save(context,observed)
+            }
+            val same=kotlin.math.abs(ltp-observed.stagnantPrice)<0.005
+            val isStagnant=ShortExitWatch.stagnant(observed.stagnantSinceMs,nowMs,same)
+            val isLower=ShortExitWatch.atBand(ltp,live.lower)
+            val isUpper=ShortExitWatch.atBand(ltp,live.upper)
+            if(isStagnant || isLower || isUpper) {
+                val why=when { isUpper->"upper circuit";isLower->"lower circuit";else->"unchanged price 10 minutes" }
+                if(live.offerQty<=0 || (live.lastTradeMs>0 && nowMs-live.lastTradeMs>120_000L)) {
+                    warn(context,"URGENT: SHORT exit needs attention",
+                        t.symbol+" "+why+"; insufficient fresh offer-side liquidity to confirm executable cover.")
+                } else {
+                    // Cancel broker-hosted BUY OCO before a separate BUY cover; never send competing BUY orders.
+                    try {
+                        b.cancelOco(t.ocoId)
+                        val remaining=b.misQty(t.symbol)
+                        if(remaining<0) {
+                            val ref=t.exitRef.ifBlank { GrowwShortBroker.ref() }
+                            save(context,observed.copy(state="COVER_PENDING",exitRef=ref))
+                            runCatching { b.status(ref) }.getOrNull()
+                                ?:b.submit(t.symbol,-remaining,"BUY",ref)
+                            warn(context,"Short BUY cover requested",t.symbol+" "+why+"; confirm filled status in Groww.")
+                        } else save(context,observed.copy(state="CLOSED"))
+                    } catch(ex:Exception) {
+                        warn(context,"URGENT: watchdog exit unresolved",t.symbol+" "+why+": "+ex.message)
+                    }
+                    return@withContext
+                }
+            }
             if(-actual<t.qtyFilled) {
                 val bodyQty=-actual
                 // A broker exit may have partially filled. Prevent a remaining
